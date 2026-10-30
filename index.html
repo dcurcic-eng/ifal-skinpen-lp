@@ -2,6 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-PP873XSL');</script>
+<!-- End Google Tag Manager -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>SkinPen® Microneedling in Longmont | $75 Off | Institute for Ageless Living</title>
 <meta name="description" content="FDA-cleared SkinPen® microneedling in Longmont, CO. Smoother texture, softer acne scars and fine lines, safe for every skin tone. New patients get $75 off their first treatment.">
@@ -289,6 +296,7 @@ section{position:relative}
 .field textarea{height:7.2rem;resize:none;padding-top:0}
 .field ::placeholder{color:var(--w60);opacity:1}
 .form .fine{font-size:1.3rem;line-height:1.5}
+.hp-field{position:absolute!important;left:-9999px!important;top:auto!important;width:1px;height:1px;overflow:hidden}
 .form__status{font:500 1.4rem/1.5 var(--sans);color:var(--gold)}.form__status:empty{display:none}
 .map{position:relative;height:42rem;border-radius:1.4rem;overflow:hidden;border:1px solid var(--c20);background:#2a2a2a}
 .map iframe{position:absolute;inset:0;width:100%;height:100%;border:0;filter:grayscale(1) invert(.9) contrast(.9) brightness(.95)}
@@ -565,6 +573,10 @@ a.footer-col-val.is-tap{color:var(--gold)}
 </style>
 </head>
 <body>
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PP873XSL"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-arrow" viewBox="22 22 36 36"><path d="M24.81 39.98h29.97m-6.04-6.11l6.08 6.11-6.08 6.17"/></symbol>
   <symbol id="i-check" viewBox="26 26 28 28"><path d="M29.29 41.03l6.96 6.92c0.37 0.36 0.92 0.39 1.29 0.03l13.63-13.63"/></symbol>
@@ -844,7 +856,7 @@ a.footer-col-val.is-tap{color:var(--gold)}
         <li><div class="info__item"><svg class="ico" style="stroke:var(--gold);stroke-width:2.4"><use href="#i-clock"/></svg><span><span class="info__main">Mon to Fri 6:30 AM to 6:30 PM</span><span class="info__sub">Saturday by appointment. Sunday closed.</span></span></div></li>
       </ul>
     </div>
-    <form class="form" id="lead-form" novalidate data-endpoint="">
+    <form class="form" id="lead-form" novalidate>
       <div class="form__head" data-reveal-group>
         <h2 class="form__title reveal">Claim Your $75 Off</h2>
         <p class="body16 reveal">Send your details and our team will call to book your first SkinPen® treatment.</p>
@@ -859,6 +871,7 @@ a.footer-col-val.is-tap{color:var(--gold)}
       </div>
       <div class="field"><label for="f-goal">What would you like to improve?</label><textarea id="f-goal" name="goal" placeholder="Acne scars, fine lines, texture"></textarea></div>
       <input type="hidden" name="offer" value="SkinPen $75 off, new patients">
+      <div class="hp-field" aria-hidden="true"><label for="company_website">Company website</label><input id="company_website" name="company_website" type="text" tabindex="-1" autocomplete="off"></div>
       <button class="btn btn--primary btn--block" type="submit"><span class="btn__fill" aria-hidden="true"></span><span class="btn__label">Claim $75 Off</span><span class="btn__icon" aria-hidden="true"><svg class="ico" style="stroke:var(--gold);stroke-width:2.6"><use href="#i-arrow"/></svg></span></button>
       <p class="form__status" role="status" aria-live="polite"></p>
       <p class="fine">New patients only. One per person. Cannot be combined with other offers.</p>
@@ -1125,36 +1138,80 @@ a.footer-col-val.is-tap{color:var(--gold)}
     }
   });
 
-  /* Lead form: posts to data-endpoint when set, otherwise opens a prefilled email to the clinic */
+  /* Lead form -> Decoda via lead.php (same folder) */
   var form = $("#lead-form");
+  var ENDPOINT = "lead.php";
+  var TRACKED = [
+    "utm_source","utm_medium","utm_campaign","utm_term","utm_content","utm_id",
+    "gclid","gbraid","wbraid","fbclid","ttclid","msclkid","li_fat_id"
+  ];
+  var STORE_KEY = "ifal_attr";
+  // First-touch attribution: survives in-page navigation that drops the query string.
+  function getAttribution(){
+    var current = {}, qs = new URLSearchParams(window.location.search);
+    TRACKED.forEach(function(k){ var v = qs.get(k); if (v) current[k] = v; });
+    try {
+      if (Object.keys(current).length){ sessionStorage.setItem(STORE_KEY, JSON.stringify(current)); return current; }
+      var saved = sessionStorage.getItem(STORE_KEY);
+      if (saved) return JSON.parse(saved) || {};
+    } catch (e) { /* storage blocked */ }
+    return current;
+  }
+  getAttribution();
   form.addEventListener("submit", function(e){
     e.preventDefault();
     var status = $(".form__status", form), btn = $("button[type=submit]", form);
-    var bad = $$("[required]", form).filter(function(f){ return !f.value.trim() || (f.type === "email" && !/^\S+@\S+\.\S+$/.test(f.value)); });
-    if (bad.length){
-      status.textContent = "Please fill in your name, phone and a valid email.";
-      bad[0].focus();
+    var label = $(".btn__label", btn), origLabel = label.textContent;
+    function val(name){ var el = form.elements[name]; return el && el.value ? el.value.trim() : ""; }
+    function fail(msg, field){
+      status.textContent = msg;
+      if (field) field.focus();
       if (hasGsap) gsap.fromTo(btn, { x: 0 }, { keyframes: { x: [-4, 4, -2, 0] }, duration: 0.3, ease: "power1.out" });
-      return;
     }
-    var data = new FormData(form), endpoint = form.getAttribute("data-endpoint");
-    var label = $(".btn__label", btn);
-    btn.disabled = true; btn.setAttribute("aria-busy", "true");
-    if (endpoint){
-      fetch(endpoint, { method: "POST", body: data }).then(function(r){
-        if (!r.ok) throw new Error("bad status");
-        label.textContent = "Sent"; status.textContent = "Thank you. Our team will call you shortly to book your visit.";
-        form.reset();
-      }).catch(function(){
-        status.textContent = "Something went wrong. Please call (720) 340-5522.";
-        btn.disabled = false; btn.removeAttribute("aria-busy");
+    var firstName = val("first_name"), lastName = val("last_name"), email = val("email");
+    var phone = val("phone").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+    if (!firstName || !lastName) return fail("Please enter your first and last name.", !firstName ? form.elements.first_name : form.elements.last_name);
+    if (!/^\d{10}$/.test(phone)) return fail("Please enter a 10-digit US phone number.", form.elements.phone);
+    if (!/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(email)) return fail("Please enter a valid email address.", form.elements.email);
+    var goal = val("goal"), offer = val("offer");
+    var payload = {
+      firstName: firstName,
+      lastName: lastName,
+      email: email,
+      phone: phone,
+      message: (goal || "(none given)") + (offer ? "\nOffer: " + offer : ""),
+      smsConsent: false,
+      pageUrl: window.location.href,
+      referrer: document.referrer || "",
+      attribution: getAttribution(),
+      company_website: val("company_website")
+    };
+    status.textContent = "";
+    btn.disabled = true; btn.setAttribute("aria-busy", "true"); label.textContent = "Sending…";
+    fetch(ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).then(function(r){
+      return r.json().catch(function(){ return null; }).then(function(data){
+        if (!r.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Server error");
       });
-    } else {
-      var body = "First name: " + data.get("first_name") + "\nLast name: " + data.get("last_name") + "\nPhone: " + data.get("phone") + "\nEmail: " + data.get("email") + "\nGoals: " + (data.get("goal") || "") + "\nOffer: " + data.get("offer");
-      window.location.href = "mailto:wellness@if-al.com?subject=" + encodeURIComponent("SkinPen $75 off request") + "&body=" + encodeURIComponent(body);
-      status.textContent = "Your email app is opening with your details. Send it and our team will call to book.";
+    }).then(function(){
+      // GTM: these pushes are the only submission counting
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({ "event": "form-success", "form_name": "ifal_skinpen_ad_form", "form_location": window.location.href });
+      window.dataLayer.push({ "event": "lead_submit", "form_name": "ifal_skinpen_ad_form", "form_location": window.location.href });
+      label.textContent = "Sent";
+      btn.removeAttribute("aria-busy");
+      status.textContent = "Thank you. Our team will call you shortly to book your visit.";
+      form.reset();
+    }).catch(function(err){
+      console.error(err);
+      var m = err && err.message ? err.message : "";
+      status.textContent = /^Please |Too many submissions/.test(m) ? m : "Something went wrong. Please call (720) 340-5522.";
+      label.textContent = origLabel;
       btn.disabled = false; btn.removeAttribute("aria-busy");
-    }
+    });
   });
 
   if (!hasGsap) { $$(".faq-item:not(.is-open) .faq-a").forEach(function(p){ p.style.height = "0px"; }); return; }
